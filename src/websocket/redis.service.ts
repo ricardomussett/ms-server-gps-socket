@@ -78,8 +78,14 @@ export class RedisService {
   public matchesFilters(data: any, filters: any): boolean {
     if (!filters) return true;
 
-    if (filters.pseudoIP && data.pseudoIP !== filters.pseudoIP) {
-      return false;
+    if (filters.pseudoIP) {
+      if (Array.isArray(filters.pseudoIP)) {
+        if (!filters.pseudoIP.includes(data.pseudoIP)) {
+          return false;
+        }
+      } else if (data.pseudoIP !== filters.pseudoIP) {
+        return false;
+      }
     }
 
     if (filters.startDate || filters.endDate) {

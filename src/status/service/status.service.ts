@@ -1,26 +1,30 @@
 import { Injectable } from '@nestjs/common';
 import { CreateStatusDto } from '../dto/create-status.dto';
 import { UpdateStatusDto } from '../dto/update-status.dto';
+import { GpsWebSocketGateway } from '../../websocket/websocket.gateway';
 
 @Injectable()
 export class StatusService {
+  constructor(private readonly wsGateway: GpsWebSocketGateway) {}
+
   create(createStatusDto: CreateStatusDto) {
     return 'This action adds a new status';
   }
 
-  findAll() {
-    return `This action returns all status`;
-  }
+  getWebSocketStatus() {
+    const server = this.wsGateway.server;
+    if (!server) {
+      return {
+        status: 'offline',
+        port: null,
+        connectedClients: 0
+      };
+    }
 
-  findOne(id: number) {
-    return `This action returns a #${id} status`;
-  }
-
-  update(id: number, updateStatusDto: UpdateStatusDto) {
-    return `This action updates a #${id} status`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} status`;
+    return {
+      status: 'online',
+      port: process.env.PORT ?? 3069,
+      connectedClients: server.engine.clientsCount
+    };
   }
 }

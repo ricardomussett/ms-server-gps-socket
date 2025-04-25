@@ -1,98 +1,112 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Servidor GPS con WebSocket
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Servidor NestJS para manejo de posiciones GPS en tiempo real utilizando WebSocket y Redis.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Características
 
-## Description
+- Servidor WebSocket para comunicación en tiempo real
+- Integración con Redis para almacenamiento y pub/sub
+- API REST para consulta de posiciones
+- Filtrado de posiciones en tiempo real
+- Escalable y de alto rendimiento
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Requisitos Previos
 
-## Project setup
+- Docker y Docker Compose
+- Node.js 22 o superior
+- pnpm como gestor de paquetes
 
-```bash
-$ pnpm install
+## Configuración del Entorno
+
+1. Crear un archivo `.env` en la raíz del proyecto con las siguientes variables:
+
+```env
+PORT=3069
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_DB=1
+REDIS_KEY_PREFIX=truck
 ```
 
-## Compile and run the project
+### Variables de Entorno
+
+- `PORT`: Puerto donde se ejecutará la aplicación (por defecto: 3000)
+- `REDIS_HOST`: Host de Redis (por defecto: redis)
+- `REDIS_PORT`: Puerto de Redis (por defecto: 6379)
+- `REDIS_DB`: Base de datos de Redis a utilizar (por defecto: 0)
+- `REDIS_KEY_PREFIX`: Prefijo para las claves de Redis (por defecto: gps_)
+
+## Despliegue con Docker Compose
+
+1. Construir las imágenes:
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+docker-compose build
 ```
 
-## Run tests
+2. Iniciar los servicios:
 
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+docker-compose up -d
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+3. Verificar los logs:
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+docker-compose logs -f
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+4. Detener los servicios:
 
-## Resources
+```bash
+docker-compose down
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+## Estructura del Proyecto
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```
+src/
+├── websocket/           # Módulo de WebSocket
+│   ├── redis.service.ts # Servicio de Redis
+│   └── websocket.gateway.ts # Gateway de WebSocket
+├── main.ts             # Punto de entrada
+└── app.module.ts       # Módulo principal
+```
 
-## Support
+## Uso de la API
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### WebSocket
 
-## Stay in touch
+Conectarse al WebSocket:
+```javascript
+const socket = io('http://localhost:3000');
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+// Escuchar actualizaciones de posición
+socket.on('position-update', (data) => {
+  console.log('Nueva posición:', data);
+});
+```
 
-## License
+### REST API
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- `GET /positions`: Obtener todas las posiciones
+- `GET /positions/filtered`: Obtener posiciones filtradas
+- `POST /positions`: Actualizar posición
+
+## Desarrollo Local
+
+1. Instalar dependencias:
+```bash
+pnpm install
+```
+
+2. Iniciar en modo desarrollo:
+```bash
+pnpm run start:dev
+```
+
+3. Construir para producción:
+```bash
+pnpm run build
+```
+

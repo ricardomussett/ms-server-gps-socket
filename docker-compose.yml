@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  app:
+    image: msservergpsocket:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT}:${PORT}"
+    environment:
+      - PORT=${PORT}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DB=${REDIS_DB}
+      - REDIS_KEY_PREFIX=${REDIS_KEY_PREFIX}
+      - NODE_ENV=production
+    networks:
+      - postgresql_postgres_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+networks:
+  postgresql_postgres_network:
+    external: true

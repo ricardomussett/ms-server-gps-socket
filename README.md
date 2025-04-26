@@ -93,6 +93,49 @@ socket.on('position-update', (data) => {
 - `GET /positions/filtered`: Obtener posiciones filtradas
 - `POST /positions`: Actualizar posición
 
+### Canales WebSocket Disponibles
+
+El servidor WebSocket proporciona los siguientes canales y eventos:
+
+#### Conexión
+```javascript
+const socket = io('http://localhost:3069');
+```
+
+#### Eventos del Cliente
+- `request-data`: Solicitar datos iniciales con filtros
+  ```javascript
+  socket.emit('request-data', {
+    pseudoIPs: ['IP1', 'IP2'] // Array de pseudoIPs a filtrar
+  });
+  ```
+
+#### Eventos del Servidor
+- `positions`: Recibe las posiciones iniciales filtradas
+  ```javascript
+  socket.on('positions', (data) => {
+    console.log('Posiciones iniciales:', data);
+  });
+  ```
+
+- `update-positions`: Recibe actualizaciones de posición en tiempo real
+  ```javascript
+  socket.on('update-positions', (data) => {
+    console.log('Actualización de posición:', data);
+  });
+  ```
+
+#### Estado del Servidor
+- `GET /status/websocket`: Verifica el estado del servidor WebSocket
+  ```javascript
+  // Retorna:
+  {
+    status: 'online' | 'offline',
+    port: number,
+    connectedClients: number
+  }
+  ```
+
 ## Desarrollo Local
 
 1. Instalar dependencias:

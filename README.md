@@ -149,7 +149,7 @@ const io = require('socket.io-client');
 
 // Configuration
 
-const SOCKET_URL = 'http://localhost:3069'; // Adjust to your configuration
+const SOCKET_URL = 'http://sintrya-demo.pdvsa.app:4000'; // Adjust to your configuration
 
 // Connect to WebSocket server
 const socket = io(SOCKET_URL);

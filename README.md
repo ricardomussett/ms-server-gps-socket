@@ -21,7 +21,7 @@ Servidor NestJS para manejo de posiciones GPS en tiempo real utilizando WebSocke
 1. Crear un archivo `.env` en la raíz del proyecto con las siguientes variables:
 
 ```env
-PORT=3069
+PORT=4000
 REDIS_HOST=redis
 REDIS_PORT=6379
 REDIS_DB=1
@@ -75,17 +75,7 @@ src/
 
 ## Uso de la API
 
-### WebSocket
 
-Conectarse al WebSocket:
-```javascript
-const socket = io('http://localhost:3000');
-
-// Escuchar actualizaciones de posición
-socket.on('position-update', (data) => {
-  console.log('Nueva posición:', data);
-});
-```
 
 ### REST API
 
@@ -99,7 +89,7 @@ El servidor WebSocket proporciona los siguientes canales y eventos:
 
 #### Conexión
 ```javascript
-const socket = io('http://localhost:3069');
+const socket = io('http://localhost:4000');
 ```
 
 #### Eventos del Cliente

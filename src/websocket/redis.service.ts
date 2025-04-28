@@ -1,15 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Redis } from 'ioredis';
-import { FilterDto } from './dto/filter.dto';
+import { Injectable, Logger } from '@nestjs/common'
+import { Redis } from 'ioredis'
+import { FilterDto } from './dto/filter.dto'
 
 @Injectable()
 export class RedisService {
-  private readonly logger = new Logger(RedisService.name);
-  private redisSubscriber: Redis;
-  private redisClient: Redis;
+  private readonly logger = new Logger(RedisService.name)
+  private redisSubscriber: Redis
+  private redisClient: Redis
 
   constructor() {
-    this.initializeRedis();
+    this.initializeRedis()
   }
 
   /**
@@ -26,33 +26,33 @@ export class RedisService {
       host: process.env.REDIS_HOST || 'localhost',
       port: parseInt(process.env.REDIS_PORT || '6379'),
       db: parseInt(process.env.REDIS_DB || '1'),
-    };
+    }
 
     // Instancia de Redis para comandos de lectura/escritura
-    this.redisClient = new Redis(redisConfig);
+    this.redisClient = new Redis(redisConfig)
     // Instancia de Redis dedicada a manejar pub/sub
-    this.redisSubscriber = new Redis(redisConfig);
+    this.redisSubscriber = new Redis(redisConfig)
 
     // Evento 'connect' del suscriptor: log y llamada a setupRedisSubscription
     this.redisSubscriber.on('connect', () => {
-      this.logger.log('Conectado a Redis como suscriptor');
-      this.setupRedisSubscription();
-    });
+      this.logger.log('Conectado a Redis como suscriptor')
+      this.setupRedisSubscription()
+    })
 
     // Evento 'error' del suscriptor: registro de error
     this.redisSubscriber.on('error', (error: Error) => {
-      this.logger.error('Error en la conexión Redis del suscriptor:', error);
-    });
+      this.logger.error('Error en la conexión Redis del suscriptor:', error)
+    })
 
     // Evento 'connect' del cliente: registro de conexión exitosa
     this.redisClient.on('connect', () => {
-      this.logger.log('Conectado a Redis como cliente');
-    });
+      this.logger.log('Conectado a Redis como cliente')
+    })
 
     // Evento 'error' del cliente: registro de error
     this.redisClient.on('error', (error: Error) => {
-      this.logger.error('Error en la conexión Redis del cliente:', error);
-    });
+      this.logger.error('Error en la conexión Redis del cliente:', error)
+    })
   }
 
   /**
@@ -62,72 +62,72 @@ export class RedisService {
    * publicado en el canal, los cuales serán gestionados por onMessage().
    * Registra logs de éxito o error durante la suscripción.
    */
-  private setupRedisSubscription(): void {
-    this.redisSubscriber.subscribe('position-updates', (err, count) => {
+  private async setupRedisSubscription(): Promise<void> {
+    await this.redisSubscriber.subscribe('position-updates', (err, count) => {
       if (err) {
         // Log de error en caso de fallo al suscribir
-        this.logger.error('Error al suscribirse al canal position-updates de Redis:', err);
+        this.logger.error('Error al suscribirse al canal position-updates de Redis:', err)
       } else {
         // Log de éxito indicando cuántos canales están suscritos
-        this.logger.log(`Suscrito exitosamente al canal 'position-updates'. Canales suscritos: ${count}`);
+        this.logger.log(`Suscrito exitosamente al canal 'position-updates'. Canales suscritos: ${count as string}`)
       }
-    });
+    })
   }
 
-    /**
-     * Registra un manejador para recibir mensajes desde Redis.
-     * Cada vez que llegue un mensaje en cualquier canal suscrito,
-     * se invocará la función callback proporcionada.
-     *
-     * @param callback - Función que recibe dos parámetros:
-     *                   channel: nombre del canal que emite el mensaje,
-     *                   message: contenido del mensaje recibido.
-     */
-    onMessage(callback: (channel: string, message: string) => void): void {
-      this.redisSubscriber.on('message', callback);
-    }
+  /**
+   * Registra un manejador para recibir mensajes desde Redis.
+   * Cada vez que llegue un mensaje en cualquier canal suscrito,
+   * se invocará la función callback proporcionada.
+   *
+   * @param callback - Función que recibe dos parámetros:
+   *                   channel: nombre del canal que emite el mensaje,
+   *                   message: contenido del mensaje recibido.
+   */
+  onMessage(callback: (channel: string, message: string) => void): void {
+    this.redisSubscriber.on('message', callback)
+  }
 
   /**
    * Recupera desde Redis todas las posiciones almacenadas y aplica los filtros indicados.
    * @param filters - Instancia de FilterDto con criterios de búsqueda (por ejemplo, pseudoIPs).
-   * @returns Promise<any[]> - Array de objetos de posición que cumplen los filtros. 
+   * @returns Promise<any[]> - Array de objetos de posición que cumplen los filtros.
    *                           Devuelve array vacío si no hay coincidencias o ante un error.
    */
   async getFilteredPositions(filters: FilterDto): Promise<any[]> {
     try {
       // Definir prefijo para las claves en Redis. Por defecto 'truck'.
-      const prefix = process.env.REDIS_KEY_PREFIX || 'truck';
+      const prefix = process.env.REDIS_KEY_PREFIX || 'truck'
       // Construir patrón para buscar todas las claves de posición
-      const pattern = `${prefix}:*`;
+      const pattern = `${prefix}:*`
       // Obtener todas las claves que cumplan con el patrón
-      let keys = await this.redisClient.keys(pattern);
+      let keys = await this.redisClient.keys(pattern)
 
       // Excluir posibles claves mal formadas como '<prefix>:undefined'
-      const invalidKey = `${prefix}:undefined`;
-      keys = keys.filter(key => key !== invalidKey);
+      const invalidKey = `${prefix}:undefined`
+      keys = keys.filter((key) => key !== invalidKey)
 
       // Si no existen claves válidas, retornar lista vacía
       if (keys.length === 0) {
-        return [];
+        return []
       }
 
-      const positionsList: any[] = [];
+      const positionsList: any[] = []
       // Recorrer cada clave válida para obtener sus datos y aplicar filtros
       for (const key of keys) {
         // Leer todos los campos del hash almacenado en Redis
-        const data = await this.redisClient.hgetall(key);
+        const data = await this.redisClient.hgetall(key)
         // Verificar que existan datos y que cumplan los criterios de filtrado
         if (data && Object.keys(data).length > 0 && this.matchesFilters(data, filters)) {
-          positionsList.push(data);
+          positionsList.push(data)
         }
       }
 
       // Devolver el array con las posiciones que pasaron el filtro
-      return positionsList;
+      return positionsList
     } catch (error) {
       // En caso de error, registrar y devolver array vacío
-      this.logger.error('Error al obtener posiciones filtradas:', error);
-      return [];
+      this.logger.error('Error al obtener posiciones filtradas:', error)
+      return []
     }
   }
 
@@ -137,10 +137,10 @@ export class RedisService {
    * @param filters - Filtros a aplicar (FilterDto), opcional.
    * @returns true si no hay filtros o si `data` coincide con los filtros; false en caso contrario.
    */
-  public matchesFilters(data: any, filters: FilterDto): boolean {
+  public matchesFilters(data: Record<string, string>, filters: FilterDto): boolean {
     // Si no se proporcionan filtros, acepta todos los datos
     if (!filters) {
-      return true;
+      return true
     }
 
     // Verificar filtro de pseudoIPs si existe
@@ -149,17 +149,17 @@ export class RedisService {
       if (Array.isArray(filters.pseudoIPs)) {
         // Rechaza si el gpsPseudoIP del dato no está en la lista
         if (!filters.pseudoIPs.includes(data.gpsPseudoIP)) {
-          return false;
+          return false
         }
       } else {
         // Caso: filtro con un único pseudoIP
         if (data.gpsPseudoIP !== filters.pseudoIPs) {
-          return false;
+          return false
         }
       }
     }
 
     // Todos los filtros pasaron, devuelve true
-    return true;
+    return true
   }
 }

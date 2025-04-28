@@ -1,8 +1,14 @@
-import { WebSocketGateway, WebSocketServer, SubscribeMessage, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
-import { RedisService } from './redis.service';
-import { FilterDto } from './dto/filter.dto';
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets'
+import { Server, Socket } from 'socket.io'
+import { Logger } from '@nestjs/common'
+import { RedisService } from './redis.service'
+import { FilterDto } from './dto/filter.dto'
 
 @WebSocketGateway({
   cors: {
@@ -10,16 +16,16 @@ import { FilterDto } from './dto/filter.dto';
   },
 })
 export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  @WebSocketServer() server: Server;
-  private readonly logger = new Logger(GpsWebSocketGateway.name);
-  private clientFilters: Map<string, any> = new Map();
-  
+  @WebSocketServer() server: Server
+  private readonly logger = new Logger(GpsWebSocketGateway.name)
+  private clientFilters: Map<string, any> = new Map()
+
   constructor(private readonly redisService: RedisService) {
     this.redisService.onMessage((channel, message) => {
-      this.handleRedisMessage(channel, message);
-    });
+      this.handleRedisMessage(channel, message)
+    })
   }
-  
+
   /**
    * Manejador que se invoca cuando un cliente se conecta al WebSocket.
    *
@@ -28,11 +34,11 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
    *
    * @param client Socket que representa al cliente conectado.
    */
-  async handleConnection(client: Socket): Promise<void> {
+  handleConnection(client: Socket): void {
     // Loguea la conexión del cliente con su identificación única
-    this.logger.log(`Cliente conectado: ${client.id}`);
+    this.logger.log(`Cliente conectado: ${client.id}`)
   }
-  
+
   /**
    * Manejador de desconexión de clientes WebSocket.
    *
@@ -44,11 +50,11 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
    */
   handleDisconnect(client: Socket): void {
     // Loguea la desconexión del cliente con identificación única
-    this.logger.log(`Cliente desconectado: ${client.id}`);
+    this.logger.log(`Cliente desconectado: ${client.id}`)
     // Remueve el filtro previamente registrado para este cliente
-    this.clientFilters.delete(client.id);
+    this.clientFilters.delete(client.id)
   }
-    
+
   /**
    * Maneja la petición de datos iniciales desde el cliente.
    *
@@ -63,13 +69,13 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   async handleRequestData(client: Socket, payload: FilterDto): Promise<void> {
     try {
       // Guarda el filtro asociado al cliente usando su ID como clave
-      this.clientFilters.set(client.id, payload);
+      this.clientFilters.set(client.id, payload)
 
       // Envía al cliente las posiciones iniciales aplicando el filtro registrado
-      await this.sendInitialPositions(client);
+      await this.sendInitialPositions(client)
     } catch (error) {
       // Registra el error en caso de fallo al obtener o enviar los datos filtrados
-      this.logger.error('Error al obtener datos filtrados:', error);
+      this.logger.error('Error al obtener datos filtrados:', error)
     }
   }
 
@@ -87,21 +93,20 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   private async sendInitialPositions(client: Socket) {
     try {
       // 1. Obtener el filtro asignado al cliente
-      const clientFilter = this.clientFilters.get(client.id);
-      
+      const clientFilter = this.clientFilters.get(client.id) as FilterDto
+
       // 2. Consultar Redis para obtener las posiciones filtradas
-      const positions = await this.redisService.getFilteredPositions(clientFilter);
-      
+      const positions = await this.redisService.getFilteredPositions(clientFilter)
+
       // 3. Solo emitir si hay posiciones válidas
       if (positions.length > 0) {
-        client.emit('positions', positions);
+        client.emit('positions', positions)
       }
     } catch (error) {
       // 4. Registrar cualquier fallo en obtención o envío de datos
-      this.logger.error('Error al enviar posiciones iniciales:', error);
+      this.logger.error('Error al enviar posiciones iniciales:', error)
     }
   }
-
 
   /**
    * Maneja los mensajes entrados desde Redis para actualizaciones de posición.
@@ -120,54 +125,54 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
     if (channel === 'position-updates') {
       try {
         // Convertir el string JSON en objeto
-        const data = JSON.parse(message);
+        const data = JSON.parse(message) as { type: string; data: unknown; timestamp: string }
 
         // Si el mensaje es de tipo 'position', manejar la actualización
         if (data.type === 'position') {
-          this.handlePositionUpdate(data);
+          this.handlePositionUpdate(data)
         }
       } catch (error) {
         // Registrar cualquier error al parsear o procesar el mensaje
-        this.logger.error('Error al procesar mensaje de Redis:', error);
+        this.logger.error('Error al procesar mensaje de Redis:', error)
       }
     }
   }
 
-
-/**
- * Maneja la actualización de posición recibida desde Redis.
- *
- * Este método realiza los siguientes pasos:
- *   1. Extrae los datos de posición de `data.data` y añade la `timestamp`.
- *   2. Recorre todos los clientes conectados al servidor.
- *   3. Filtra y emite la actualización solo a los clientes cuyos filtros coincidan.
- *
- * @param data Objeto con la información de la actualización:
- *             - data.data: datos de posición (latitud, longitud, etc.).
- *             - data.timestamp: marca de tiempo de la actualización.
- * @returns void
- */
-private handlePositionUpdate(data: any): void {
-  try {
-    // Construir objeto de posición a partir de los datos recibidos y la marca de tiempo
-    const positionData = {
-      ...data.data,
-      timestamp: data.timestamp,
-    };
-
-    // Iterar sobre cada cliente conectado al servidor WebSocket
-    this.server.sockets.sockets.forEach((client) => {
-      // Obtener el filtro asociado a este cliente
-      const clientFilter = this.clientFilters.get(client.id);
-
-      // Si la posición cumple con el filtro del cliente, emitir el evento 'update-positions'
-      if (this.redisService.matchesFilters(positionData, clientFilter)) {
-        client.emit('update-positions', positionData);
+  /**
+   * Maneja la actualización de posición recibida desde Redis.
+   *
+   * Este método realiza los siguientes pasos:
+   *   1. Extrae los datos de posición de `data.data` y añade la `timestamp`.
+   *   2. Recorre todos los clientes conectados al servidor.
+   *   3. Filtra y emite la actualización solo a los clientes cuyos filtros coincidan.
+   *
+   * @param data Objeto con la información de la actualización:
+   *             - data.data: datos de posición (latitud, longitud, etc.).
+   *             - data.timestamp: marca de tiempo de la actualización.
+   * @returns void
+   */
+  private handlePositionUpdate(data: { data: unknown; timestamp: string }): void {
+    try {
+      // Construir objeto de posición a partir de los datos recibidos y la marca de tiempo
+      const safeData = data.data && typeof data.data === 'object' && !Array.isArray(data.data) ? data.data : {}
+      const positionData = {
+        ...safeData,
+        timestamp: data.timestamp,
       }
-    });
-  } catch (error) {
-    // Registrar cualquier error que ocurra durante el proceso
-    this.logger.error('Error al manejar actualización de posición:', error);
+
+      // Iterar sobre cada cliente conectado al servidor WebSocket
+      this.server.sockets.sockets.forEach((client) => {
+        // Obtener el filtro asociado a este cliente
+        const clientFilter = this.clientFilters.get(client.id) as FilterDto
+
+        // Si la posición cumple con el filtro del cliente, emitir el evento 'update-positions'
+        if (this.redisService.matchesFilters(positionData, clientFilter)) {
+          client.emit('update-positions', positionData)
+        }
+      })
+    } catch (error) {
+      // Registrar cualquier error que ocurra durante el proceso
+      this.logger.error('Error al manejar actualización de posición:', error)
+    }
   }
 }
-} 

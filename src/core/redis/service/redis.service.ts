@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Redis } from 'ioredis'
-import { FilterDto } from './dto/filter.dto'
+import { FilterDto } from '../../../app/websocket/application/dto/filter.dto'
+import { redisConfig } from 'src/core/config/redis.config'
 
 @Injectable()
 export class RedisService {
@@ -22,21 +23,25 @@ export class RedisService {
    */
   private initializeRedis() {
     // Configuración de Redis extraída de las variables de entorno
-    const redisConfig = {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      db: parseInt(process.env.REDIS_DB || '1'),
+    const redis = {
+      host: redisConfig.host,
+      port: redisConfig.port,
+      db: redisConfig.db,
     }
 
     // Instancia de Redis para comandos de lectura/escritura
-    this.redisClient = new Redis(redisConfig)
+    this.redisClient = new Redis(redis)
     // Instancia de Redis dedicada a manejar pub/sub
-    this.redisSubscriber = new Redis(redisConfig)
+    this.redisSubscriber = new Redis(redis)
 
+    this.redisManagement()
+  }
+
+  private redisManagement() {
     // Evento 'connect' del suscriptor: log y llamada a setupRedisSubscription
     this.redisSubscriber.on('connect', () => {
       this.logger.log('Conectado a Redis como suscriptor')
-      this.setupRedisSubscription()
+      void this.setupRedisSubscription()
     })
 
     // Evento 'error' del suscriptor: registro de error

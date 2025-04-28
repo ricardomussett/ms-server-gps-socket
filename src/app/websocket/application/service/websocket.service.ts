@@ -1,30 +1,16 @@
-import {
-  WebSocketGateway,
-  WebSocketServer,
-  SubscribeMessage,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-} from '@nestjs/websockets'
+import { WebSocketServer } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
-import { Logger } from '@nestjs/common'
-import { RedisService } from './redis.service'
-import { FilterDto } from './dto/filter.dto'
+import { Injectable, Logger } from '@nestjs/common'
+import { RedisService } from '../../../../core/redis/service/redis.service'
+import { FilterDto } from '../dto/filter.dto'
 
-@WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
-})
-export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
+@Injectable()
+export class WebSocketService {
   @WebSocketServer() server: Server
-  private readonly logger = new Logger(GpsWebSocketGateway.name)
+  private readonly logger = new Logger(WebSocketService.name)
   private clientFilters: Map<string, any> = new Map()
 
-  constructor(private readonly redisService: RedisService) {
-    this.redisService.onMessage((channel, message) => {
-      this.handleRedisMessage(channel, message)
-    })
-  }
+  constructor(private readonly redisService: RedisService) {}
 
   /**
    * Manejador que se invoca cuando un cliente se conecta al WebSocket.
@@ -56,30 +42,6 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   }
 
   /**
-   * Maneja la petición de datos iniciales desde el cliente.
-   *
-   * Este método se ejecuta cuando el cliente emite el evento 'request-data'.
-   * Almacena el filtro recibido y posteriormente envía las posiciones iniciales
-   * que cumplen con dicho filtro.
-   *
-   * @param client  Instancia del socket del cliente que solicita los datos.
-   * @param payload Objeto FilterDto con los criterios de filtrado proporcionados por el cliente.
-   */
-  @SubscribeMessage('request-data')
-  async handleRequestData(client: Socket, payload: FilterDto): Promise<void> {
-    try {
-      // Guarda el filtro asociado al cliente usando su ID como clave
-      this.clientFilters.set(client.id, payload)
-
-      // Envía al cliente las posiciones iniciales aplicando el filtro registrado
-      await this.sendInitialPositions(client)
-    } catch (error) {
-      // Registra el error en caso de fallo al obtener o enviar los datos filtrados
-      this.logger.error('Error al obtener datos filtrados:', error)
-    }
-  }
-
-  /**
    * Envía las posiciones iniciales al cliente según el filtro registrado.
    *
    * Pasos:
@@ -90,7 +52,7 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
    *
    * @param client - Instancia de Socket del cliente que solicita los datos.
    */
-  private async sendInitialPositions(client: Socket) {
+  public async sendInitialPositions(client: Socket) {
     try {
       // 1. Obtener el filtro asignado al cliente
       const clientFilter = this.clientFilters.get(client.id) as FilterDto
@@ -120,21 +82,26 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
    * @param channel - Nombre del canal de Redis que envía el mensaje.
    * @param message - Mensaje en formato JSON con la actualización.
    */
-  private handleRedisMessage(channel: string, message: string): void {
-    // Solo procesar mensajes del canal 'position-updates'
-    if (channel === 'position-updates') {
-      try {
-        // Convertir el string JSON en objeto
-        const data = JSON.parse(message) as { type: string; data: unknown; timestamp: string }
+  handleMessage(channel: string, message: string): void {
+    try {
+      // Solo procesar mensajes del canal 'position-updates'
+      if (channel === 'position-updates') {
+        try {
+          // Convertir el string JSON en objeto
+          const data = JSON.parse(message) as { type: string; data: unknown; timestamp: string }
 
-        // Si el mensaje es de tipo 'position', manejar la actualización
-        if (data.type === 'position') {
-          this.handlePositionUpdate(data)
+          // Si el mensaje es de tipo 'position', manejar la actualización
+          if (data.type === 'position') {
+            this.handlePositionUpdate(data)
+          }
+        } catch (error) {
+          // Registrar cualquier error al parsear o procesar el mensaje
+          this.logger.error('Error al procesar mensaje de Redis:', error)
         }
-      } catch (error) {
-        // Registrar cualquier error al parsear o procesar el mensaje
-        this.logger.error('Error al procesar mensaje de Redis:', error)
       }
+    } catch (error) {
+      // Registrar cualquier error que ocurra durante el proceso
+      this.logger.error('Error al manejar mensaje de Redis:', error)
     }
   }
 
@@ -151,7 +118,7 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
    *             - data.timestamp: marca de tiempo de la actualización.
    * @returns void
    */
-  private handlePositionUpdate(data: { data: unknown; timestamp: string }): void {
+  handlePositionUpdate(data: { data: unknown; timestamp: string }): void {
     try {
       // Construir objeto de posición a partir de los datos recibidos y la marca de tiempo
       const safeData = data.data && typeof data.data === 'object' && !Array.isArray(data.data) ? data.data : {}
@@ -173,6 +140,23 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
     } catch (error) {
       // Registrar cualquier error que ocurra durante el proceso
       this.logger.error('Error al manejar actualización de posición:', error)
+    }
+  }
+
+  getWebSocketStatus() {
+    const server = this.server
+    if (!server) {
+      return {
+        status: 'offline',
+        port: null,
+        connectedClients: 0,
+      }
+    }
+
+    return {
+      status: 'online',
+      port: process.env.PORT ?? 3069,
+      connectedClients: server.engine.clientsCount,
     }
   }
 }

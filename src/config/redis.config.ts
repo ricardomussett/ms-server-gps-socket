@@ -4,4 +4,4 @@ export const redisConfig = {
   password: process.env.REDIS_PASSWORD,
   username: process.env.REDIS_USERNAME,
   db: parseInt(process.env.REDIS_DB || '0'),
-}; 
+}

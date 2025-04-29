@@ -144,7 +144,7 @@ export class RedisService {
    */
   public matchesFilters(data: Record<string, string>, filters: FilterDto): boolean {
     // Si no se proporcionan filtros, acepta todos los datos
-    if (!filters || filters.pseudoIPs.length === 0) {
+    if (!filters || (filters.pseudoIPs && filters.pseudoIPs.length === 0)) {
       return true
     }
 

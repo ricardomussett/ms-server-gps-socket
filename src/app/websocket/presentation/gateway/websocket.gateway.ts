@@ -12,9 +12,11 @@ import { WebSocketService } from '../../application/service/websocket.service'
 import { FilterDto } from '../../application/dto/filter.dto'
 import { ApiKeyGuard } from 'src/core/guards/api-key.guard'
 
-@WebSocketGateway(90, {
+@WebSocketGateway(Number(process.env.WS_PORT || 90), {
   cors: {
     origin: '*',
+    allowedHeaders: ['api-key'],
+    credentials: true,
   },
 })
 export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -32,6 +34,7 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   }
 
   private async handleRedisMessage(channel: string, message: string) {
+    console.log('entra en handleRedisMessage')
     await this.webSocketService.handleMessage(channel, message, this.server, this.clientFilters)
   }
 
@@ -44,8 +47,13 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
    * @param client Socket que representa al cliente conectado.
    */
   async handleConnection(client: Socket) {
-    this.logger.log(`Cliente conectado: ${client.id}`)
-    await this.webSocketService.sendInitialPositions(client, this.clientFilters)
+    const api = client.handshake.headers['x-api-key'] as string
+    const active = new ApiKeyGuard().validateApiKey(api)
+    if (!active) this.handleDisconnect(client)
+    else {
+      this.logger.log(`Cliente conectado: ${client.id}`)
+      await this.webSocketService.sendInitialPositions(client, this.clientFilters)
+    }
   }
 
   /**
@@ -57,14 +65,17 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
    *
    * @param client Instancia de Socket del cliente que se ha desconectado.
    */
-  handleDisconnect(client: Socket) {
-    this.logger.log(`Cliente desconectado: ${client.id}`)
+  handleDisconnect(client: Socket, text?: string) {
+    if (text) this.logger.log(`Cliente desconectado. Reason: ${text}`)
+    else this.logger.log(`Cliente desconectado: ${client.id}`)
     this.clientFilters.delete(client.id)
+    client.disconnect()
   }
 
-  // @UseGuards(ApiKeyGuard)
+  @UseGuards(ApiKeyGuard)
   @SubscribeMessage('request-data')
   async handleRequestData(client: Socket, payload: any) {
+    console.log('entra aqas')
     try {
       this.logger.log('Solicitud de datos recibida con filtros:', payload)
       this.clientFilters.set(client.id, payload)

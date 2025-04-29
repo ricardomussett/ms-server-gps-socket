@@ -1,25 +1,36 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common'
+import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common'
 import { Observable } from 'rxjs'
-import { Request } from 'express'
 import { timeStampDateTime } from '../utils/getActualDate.utils'
+import { Socket } from 'socket.io'
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
+  private logger: Logger = new Logger(ApiKeyGuard.name)
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
-    const request = context.switchToHttp().getRequest<Request>()
+    const client = context.switchToWs().getClient<Socket>()
     // Example usage: check for API key header
-    const apiKeyHeader = request.headers['x-api-key'] as string | undefined
+    console.log('entra')
 
-    if (!apiKeyHeader) return false
+    return this.validateApiKey(client.handshake.headers['x-api-key'] as string)
+  }
+
+  public validateApiKey(apiKeyHeader: string): boolean {
+    if (!apiKeyHeader) {
+      this.logger.error('api key no encontrada')
+      return false
+    }
 
     const splittedValues = apiKeyHeader.split('.')
     const apiKey = splittedValues[0]
     const date = splittedValues[1]
     const actualDate = timeStampDateTime().toISOString().split('T')[0]
 
-    console.log('actualDAte', actualDate)
-    console.log('date', date)
+    if (process.env.API_KEY !== apiKey && date !== actualDate) {
+      this.logger.error('api key invalida')
+      return false
+    }
 
-    return process.env.API_KEY === apiKey && date === actualDate
+    this.logger.log('Api Key correcta')
+    return true
   }
 }

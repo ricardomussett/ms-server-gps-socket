@@ -1,12 +1,13 @@
 import { Controller, Get } from '@nestjs/common'
-import { WebSocketService } from '../../application/service/websocket.service'
+import { GpsWebSocketGateway } from '../gateway/websocket.gateway'
 
 @Controller('websocket')
 export class WebSocketController {
-  constructor(private readonly webSocketService: WebSocketService) {}
+  private gateway: GpsWebSocketGateway
+  constructor() {}
 
   @Get('status')
   getWebSocketStatus() {
-    return this.webSocketService.getWebSocketStatus()
+    return this.gateway.getWebSocketStatus()
   }
 }

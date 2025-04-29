@@ -1,4 +1,3 @@
-import { WebSocketServer } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 import { Injectable, Logger } from '@nestjs/common'
 import { RedisService } from '../../../../core/redis/service/redis.service'
@@ -6,40 +5,9 @@ import { FilterDto } from '../dto/filter.dto'
 
 @Injectable()
 export class WebSocketService {
-  @WebSocketServer() server: Server
   private readonly logger = new Logger(WebSocketService.name)
-  private clientFilters: Map<string, any> = new Map()
 
   constructor(private readonly redisService: RedisService) {}
-
-  /**
-   * Manejador que se invoca cuando un cliente se conecta al WebSocket.
-   *
-   * - Registra en los logs el ID del cliente que acaba de conectarse.
-   * - Aquí se pueden inicializar recursos o filtros por defecto para el cliente.
-   *
-   * @param client Socket que representa al cliente conectado.
-   */
-  handleConnection(client: Socket): void {
-    // Loguea la conexión del cliente con su identificación única
-    this.logger.log(`Cliente conectado: ${client.id}`)
-  }
-
-  /**
-   * Manejador de desconexión de clientes WebSocket.
-   *
-   * Este método se invoca automáticamente cuando un cliente pierde la conexión.
-   * - Registra un mensaje informativo con el ID del cliente desconectado.
-   * - Elimina los filtros asociados a ese cliente para liberar memoria.
-   *
-   * @param client Instancia de Socket del cliente que se ha desconectado.
-   */
-  handleDisconnect(client: Socket): void {
-    // Loguea la desconexión del cliente con identificación única
-    this.logger.log(`Cliente desconectado: ${client.id}`)
-    // Remueve el filtro previamente registrado para este cliente
-    this.clientFilters.delete(client.id)
-  }
 
   /**
    * Envía las posiciones iniciales al cliente según el filtro registrado.
@@ -52,10 +20,10 @@ export class WebSocketService {
    *
    * @param client - Instancia de Socket del cliente que solicita los datos.
    */
-  public async sendInitialPositions(client: Socket) {
+  public async sendInitialPositions(client: Socket, clientFilters: Map<string, FilterDto>) {
     try {
       // 1. Obtener el filtro asignado al cliente
-      const clientFilter = this.clientFilters.get(client.id) as FilterDto
+      const clientFilter = clientFilters.get(client.id) as FilterDto
 
       // 2. Consultar Redis para obtener las posiciones filtradas
       const positions = await this.redisService.getFilteredPositions(clientFilter)
@@ -82,20 +50,20 @@ export class WebSocketService {
    * @param channel - Nombre del canal de Redis que envía el mensaje.
    * @param message - Mensaje en formato JSON con la actualización.
    */
-  handleMessage(channel: string, message: string): void {
+  async handleMessage(
+    channel: string,
+    message: string,
+    server: Server,
+    clientFilters: Map<string, FilterDto>,
+  ): Promise<void> {
     try {
-      // Solo procesar mensajes del canal 'position-updates'
       if (channel === 'position-updates') {
         try {
-          // Convertir el string JSON en objeto
-          const data = JSON.parse(message) as { type: string; data: unknown; timestamp: string }
-
-          // Si el mensaje es de tipo 'position', manejar la actualización
+          const data = JSON.parse(message) as { data: { id: number }; timestamp: string; type: string }
           if (data.type === 'position') {
-            this.handlePositionUpdate(data)
+            await this.handlePositionUpdate(data, server, clientFilters)
           }
         } catch (error) {
-          // Registrar cualquier error al parsear o procesar el mensaje
           this.logger.error('Error al procesar mensaje de Redis:', error)
         }
       }
@@ -118,45 +86,33 @@ export class WebSocketService {
    *             - data.timestamp: marca de tiempo de la actualización.
    * @returns void
    */
-  handlePositionUpdate(data: { data: unknown; timestamp: string }): void {
+  async handlePositionUpdate(
+    data: { data: { id: number }; timestamp: string },
+    server: Server,
+    clientFilters: Map<string, FilterDto>,
+  ) {
     try {
-      // Construir objeto de posición a partir de los datos recibidos y la marca de tiempo
       const safeData = data.data && typeof data.data === 'object' ? data.data : {}
       const positionData = {
         ...safeData,
         timestamp: data.timestamp,
       }
 
-      // Iterar sobre cada cliente conectado al servidor WebSocket
-      this.server.sockets.sockets.forEach((client) => {
-        // Obtener el filtro asociado a este cliente
-        const clientFilter = this.clientFilters.get(client.id) as FilterDto
+      this.logger.log('---Enviando actualización de posición:', positionData)
 
-        // Si la posición cumple con el filtro del cliente, emitir el evento 'update-positions'
+      // Enviar la actualización solo a los clientes cuyos filtros coincidan
+      server.sockets.sockets.forEach((client) => {
+        const clientFilter = clientFilters.get(client.id) as FilterDto
         if (this.redisService.matchesFilters(positionData, clientFilter)) {
-          client.emit('update-positions', positionData)
+          client.emit('all-positions', positionData)
         }
       })
+
+      // Actualizar Redis con la nueva posición
+      const key = `${process.env.REDIS_KEY_PREFIX || 'truck'}:${data.data.id}`
+      await this.redisService.updatePosition(key, data.data)
     } catch (error) {
-      // Registrar cualquier error que ocurra durante el proceso
       this.logger.error('Error al manejar actualización de posición:', error)
-    }
-  }
-
-  getWebSocketStatus() {
-    const server = this.server
-    if (!server) {
-      return {
-        status: 'offline',
-        port: null,
-        connectedClients: 0,
-      }
-    }
-
-    return {
-      status: 'online',
-      port: process.env.PORT ?? 3069,
-      connectedClients: server.engine.clientsCount,
     }
   }
 }

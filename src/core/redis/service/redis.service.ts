@@ -144,7 +144,7 @@ export class RedisService {
    */
   public matchesFilters(data: Record<string, string>, filters: FilterDto): boolean {
     // Si no se proporcionan filtros, acepta todos los datos
-    if (!filters) {
+    if (!filters || filters.pseudoIPs.length === 0) {
       return true
     }
 
@@ -166,5 +166,16 @@ export class RedisService {
 
     // Todos los filtros pasaron, devuelve true
     return true
+  }
+
+  async updatePosition(key: string, data: any) {
+    try {
+      await this.redisClient.hmset(key, {
+        ...data,
+        lastUpdate: new Date().toISOString(),
+      })
+    } catch (error) {
+      this.logger.error('Error al actualizar posición en Redis:', error)
+    }
   }
 }

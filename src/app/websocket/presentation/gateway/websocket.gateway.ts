@@ -6,10 +6,13 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
-import { Logger } from '@nestjs/common'
+import { Logger, UseGuards } from '@nestjs/common'
 import { RedisService } from 'src/core/redis/service/redis.service'
+import { WebSocketService } from '../../application/service/websocket.service'
+import { FilterDto } from '../../application/dto/filter.dto'
+import { ApiKeyGuard } from 'src/core/guards/api-key.guard'
 
-@WebSocketGateway({
+@WebSocketGateway(90, {
   cors: {
     origin: '*',
   },
@@ -17,74 +20,49 @@ import { RedisService } from 'src/core/redis/service/redis.service'
 export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server
   private readonly logger = new Logger(GpsWebSocketGateway.name)
-  private clientFilters: Map<string, any> = new Map()
+  private clientFilters: Map<string, FilterDto> = new Map()
 
-  constructor(private readonly redisService: RedisService) {
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly webSocketService: WebSocketService,
+  ) {
     this.redisService.onMessage((channel, message) => {
-      this.handleRedisMessage(channel, message)
+      void this.handleRedisMessage(channel, message)
     })
   }
 
-  private handleRedisMessage(channel: string, message: string) {
-    if (channel === 'position-updates') {
-      try {
-        const data = JSON.parse(message)
-        if (data.type === 'position') {
-          this.handlePositionUpdate(data)
-        }
-      } catch (error) {
-        this.logger.error('Error al procesar mensaje de Redis:', error)
-      }
-    }
+  private async handleRedisMessage(channel: string, message: string) {
+    await this.webSocketService.handleMessage(channel, message, this.server, this.clientFilters)
   }
 
-  private handlePositionUpdate(data: any) {
-    try {
-      const positionData = {
-        ...data.data,
-        timestamp: data.timestamp,
-      }
-
-      this.logger.log('---Enviando actualización de posición:', positionData)
-
-      // Enviar la actualización solo a los clientes cuyos filtros coincidan
-      this.server.sockets.sockets.forEach((client) => {
-        const clientFilter = this.clientFilters.get(client.id)
-        if (this.redisService.matchesFilters(positionData, clientFilter)) {
-          client.emit('all-positions', positionData)
-        }
-      })
-
-      // Actualizar Redis con la nueva posición
-      const key = `${process.env.REDIS_KEY_PREFIX || 'truck'}:${data.data.id}`
-      this.redisService.updatePosition(key, data.data)
-    } catch (error) {
-      this.logger.error('Error al manejar actualización de posición:', error)
-    }
-  }
-
+  /**
+   * Manejador que se invoca cuando un cliente se conecta al WebSocket.
+   *
+   * - Registra en los logs el ID del cliente que acaba de conectarse.
+   * - Aquí se pueden inicializar recursos o filtros por defecto para el cliente.
+   *
+   * @param client Socket que representa al cliente conectado.
+   */
   async handleConnection(client: Socket) {
     this.logger.log(`Cliente conectado: ${client.id}`)
-    await this.sendInitialPositions(client)
+    await this.webSocketService.sendInitialPositions(client, this.clientFilters)
   }
 
+  /**
+   * Manejador de desconexión de clientes WebSocket.
+   *
+   * Este método se invoca automáticamente cuando un cliente pierde la conexión.
+   * - Registra un mensaje informativo con el ID del cliente desconectado.
+   * - Elimina los filtros asociados a ese cliente para liberar memoria.
+   *
+   * @param client Instancia de Socket del cliente que se ha desconectado.
+   */
   handleDisconnect(client: Socket) {
     this.logger.log(`Cliente desconectado: ${client.id}`)
     this.clientFilters.delete(client.id)
   }
 
-  private async sendInitialPositions(client: Socket) {
-    try {
-      const clientFilter = this.clientFilters.get(client.id)
-      const positions = await this.redisService.getFilteredPositions(clientFilter)
-      if (Object.keys(positions).length > 0) {
-        client.emit('all-positions', positions)
-      }
-    } catch (error) {
-      this.logger.error('Error al enviar posiciones iniciales:', error)
-    }
-  }
-
+  // @UseGuards(ApiKeyGuard)
   @SubscribeMessage('request-data')
   async handleRequestData(client: Socket, payload: any) {
     try {
@@ -94,6 +72,22 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
       client.emit('all-positions', filteredPositions)
     } catch (error) {
       this.logger.error('Error al obtener datos filtrados:', error)
+    }
+  }
+
+  getWebSocketStatus() {
+    if (!this.server) {
+      return {
+        status: 'offline',
+        port: null,
+        connectedClients: 0,
+      }
+    }
+
+    return {
+      status: 'online',
+      port: process.env.PORT ?? 3069,
+      connectedClients: this.server.engine.clientsCount,
     }
   }
 }

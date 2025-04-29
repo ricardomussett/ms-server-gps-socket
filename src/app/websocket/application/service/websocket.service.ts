@@ -121,7 +121,7 @@ export class WebSocketService {
   handlePositionUpdate(data: { data: unknown; timestamp: string }): void {
     try {
       // Construir objeto de posición a partir de los datos recibidos y la marca de tiempo
-      const safeData = data.data && typeof data.data === 'object' && !Array.isArray(data.data) ? data.data : {}
+      const safeData = data.data && typeof data.data === 'object' ? data.data : {}
       const positionData = {
         ...safeData,
         timestamp: data.timestamp,

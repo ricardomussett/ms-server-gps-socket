@@ -2,7 +2,9 @@ import { WebSocketGateway, SubscribeMessage, WebSocketServer } from '@nestjs/web
 import { Server, Socket } from 'socket.io'
 import { FilterDto } from '../../application/dto/filter.dto'
 import { WebSocketService } from '../../application/service/websocket.service'
-import { Logger } from '@nestjs/common'
+import { Logger, UseGuards } from '@nestjs/common'
+import { RedisService } from 'src/core/redis/service/redis.service'
+import { ApiKeyGuard } from 'src/core/guards/api-key.guard'
 
 @WebSocketGateway({
   cors: {
@@ -14,7 +16,24 @@ export class GpsWebSocketGateway {
   private readonly logger = new Logger(WebSocketGateway.name)
   private clientFilters: Map<string, any> = new Map()
 
-  constructor(private readonly webSocketService: WebSocketService) {}
+  constructor(
+    private readonly webSocketService: WebSocketService,
+    private readonly redisService: RedisService,
+  ) {
+    this.redisService.onMessage((channel, message) => {
+      this.handleRedisMessage(channel, message)
+    })
+  }
+
+  /**
+   * Controlador de los mensajes entrados desde Redis para actualizaciones de posición.
+   *
+   * @param channel - Nombre del canal de Redis que envía el mensaje.
+   * @param message - Mensaje en formato JSON con la actualización.
+   */
+  private handleRedisMessage(channel: string, message: string): void {
+    this.webSocketService.handleMessage(channel, message)
+  }
 
   /**
    * Maneja la petición de datos iniciales desde el cliente.
@@ -26,6 +45,7 @@ export class GpsWebSocketGateway {
    * @param client  Instancia del socket del cliente que solicita los datos.
    * @param payload Objeto FilterDto con los criterios de filtrado proporcionados por el cliente.
    */
+  @UseGuards(ApiKeyGuard)
   @SubscribeMessage('request-data')
   async handleRequestData(client: Socket, payload: FilterDto): Promise<void> {
     try {

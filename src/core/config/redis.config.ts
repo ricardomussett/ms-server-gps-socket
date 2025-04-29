@@ -1,4 +1,4 @@
-export const getRedisConfig = (host: string, port: number, db: number) => {
+export const getRedisConfig = (host: string | undefined, port: number | undefined, db: number | undefined) => {
   return {
     host: host || 'localhost',
     port: port || 6379,

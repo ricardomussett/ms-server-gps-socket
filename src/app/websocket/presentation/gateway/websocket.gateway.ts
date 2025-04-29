@@ -29,12 +29,12 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
     private readonly webSocketService: WebSocketService,
   ) {
     this.redisService.onMessage((channel, message) => {
-      void this.handleRedisMessage(channel, message)
+      this.handleRedisMessage(channel, message)
     })
   }
 
-  private async handleRedisMessage(channel: string, message: string) {
-    await this.webSocketService.handleMessage(channel, message, this.server, this.clientFilters)
+  private handleRedisMessage(channel: string, message: string) {
+    this.webSocketService.handleMessage(channel, message, this.server, this.clientFilters)
   }
 
   /**
@@ -45,8 +45,7 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
    *
    * @param client Socket que representa al cliente conectado.
    */
-  async handleConnection(client: Socket) {
-    
+  handleConnection(client: Socket) {
     const api = client.handshake.headers['x-api-key'] as string
     const active = new ApiKeyGuard().validateApiKey(api)
 
@@ -87,13 +86,13 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   async handleRequestData(client: Socket, payload: FilterDto): Promise<void> {
     try {
       // Guarda el filtro asociado al cliente usando su ID como clave
-      this.clientFilters.set(client.id, payload);
-      
+      this.clientFilters.set(client.id, payload)
+
       // Envía al cliente las posiciones iniciales aplicando el filtro registrado
       await this.webSocketService.sendInitialPositions(client, this.clientFilters)
     } catch (error) {
       // Registra el error en caso de fallo al obtener o enviar los datos filtrados
-      this.logger.error('Error al obtener datos filtrados:', error);
+      this.logger.error('Error al obtener datos filtrados:', error)
     }
   }
 

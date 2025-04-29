@@ -24,7 +24,6 @@ export class WebSocketService {
     try {
       // 1. Obtener el filtro asignado al cliente
       const clientFilter = clientFilters.get(client.id) as FilterDto
-      
 
       // 2. Consultar Redis para obtener las posiciones filtradas
       const positions = await this.redisService.getFilteredPositions(clientFilter)
@@ -51,18 +50,13 @@ export class WebSocketService {
    * @param channel - Nombre del canal de Redis que envía el mensaje.
    * @param message - Mensaje en formato JSON con la actualización.
    */
-  async handleMessage(
-    channel: string,
-    message: string,
-    server: Server,
-    clientFilters: Map<string, FilterDto>,
-  ): Promise<void> {
+  handleMessage(channel: string, message: string, server: Server, clientFilters: Map<string, FilterDto>): void {
     try {
       if (channel === 'position-updates') {
         try {
           const data = JSON.parse(message) as { data: { id: number }; timestamp: string; type: string }
           if (data.type === 'position') {
-            await this.handlePositionUpdate(data, server, clientFilters)
+            this.handlePositionUpdate(data, server, clientFilters)
           }
         } catch (error) {
           this.logger.error('Error al procesar mensaje de Redis:', error)
@@ -87,7 +81,7 @@ export class WebSocketService {
    *             - data.timestamp: marca de tiempo de la actualización.
    * @returns void
    */
-  async handlePositionUpdate(
+  handlePositionUpdate(
     data: { data: { id: number }; timestamp: string },
     server: Server,
     clientFilters: Map<string, FilterDto>,
@@ -112,6 +106,4 @@ export class WebSocketService {
       this.logger.error('Error al manejar actualización de posición:', error)
     }
   }
-
-  
 }

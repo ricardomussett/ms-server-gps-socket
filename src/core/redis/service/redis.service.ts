@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Injectable, Logger } from '@nestjs/common'
 import { Redis } from 'ioredis'
 import { FilterDto } from '../../../app/websocket/application/dto/filter.dto'
@@ -24,11 +26,12 @@ export class RedisService {
    */
   private initializeRedis() {
     // Configuración de Redis extraída de las variables de entorno
-    
+
     const redis = getRedisConfig(
-      this.configService.get<string>('REDIS_HOST')!, 
-      this.configService.get<number>('REDIS_PORT')!, 
-      this.configService.get<number>('REDIS_DB')!)
+      this.configService.get<string>('REDIS_HOST'),
+      this.configService.get<number>('REDIS_PORT'),
+      this.configService.get<number>('REDIS_DB'),
+    )
 
     // Instancia de Redis para comandos de lectura/escritura
     this.redisClient = new Redis(redis)
@@ -106,7 +109,6 @@ export class RedisService {
       // Construir patrón para buscar todas las claves de posición
       const pattern = `${prefix}:*`
 
-
       // Obtener todas las claves que cumplan con el patrón
       let keys = await this.redisClient.keys(pattern)
 
@@ -170,5 +172,4 @@ export class RedisService {
     // Todos los filtros pasaron, devuelve true
     return true
   }
-
 }

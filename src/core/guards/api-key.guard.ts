@@ -8,8 +8,6 @@ export class ApiKeyGuard implements CanActivate {
   private logger: Logger = new Logger(ApiKeyGuard.name)
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
     const client = context.switchToWs().getClient<Socket>()
-    // Example usage: check for API key header
-    console.log('entra')
 
     return this.validateApiKey(client.handshake.headers['x-api-key'] as string)
   }

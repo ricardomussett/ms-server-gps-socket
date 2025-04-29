@@ -24,13 +24,14 @@ export class WebSocketService {
     try {
       // 1. Obtener el filtro asignado al cliente
       const clientFilter = clientFilters.get(client.id) as FilterDto
+      
 
       // 2. Consultar Redis para obtener las posiciones filtradas
       const positions = await this.redisService.getFilteredPositions(clientFilter)
 
       // 3. Solo emitir si hay posiciones válidas
       if (positions.length > 0) {
-        client.emit('positions', positions)
+        client.emit('initial-positions', positions)
       }
     } catch (error) {
       // 4. Registrar cualquier fallo en obtención o envío de datos
@@ -98,21 +99,19 @@ export class WebSocketService {
         timestamp: data.timestamp,
       }
 
-      this.logger.log('---Enviando actualización de posición:', positionData)
+      this.logger.log('<- Obteniendo actualización de posición:', positionData)
 
       // Enviar la actualización solo a los clientes cuyos filtros coincidan
       server.sockets.sockets.forEach((client) => {
         const clientFilter = clientFilters.get(client.id) as FilterDto
         if (this.redisService.matchesFilters(positionData, clientFilter)) {
-          client.emit('all-positions', positionData)
+          client.emit('positions', positionData)
         }
       })
-
-      // Actualizar Redis con la nueva posición
-      const key = `${process.env.REDIS_KEY_PREFIX || 'truck'}:${data.data.id}`
-      await this.redisService.updatePosition(key, data.data)
     } catch (error) {
       this.logger.error('Error al manejar actualización de posición:', error)
     }
   }
+
+  
 }

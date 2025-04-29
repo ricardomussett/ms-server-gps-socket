@@ -1,7 +1,7 @@
-export const redisConfig = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD,
-  username: process.env.REDIS_USERNAME,
-  db: parseInt(process.env.REDIS_DB || '0'),
+export const getRedisConfig = (host: string, port: number, db: number) => {
+  return {
+    host: host || 'localhost',
+    port: port || 6379,
+    db: db || 0,
+  }
 }

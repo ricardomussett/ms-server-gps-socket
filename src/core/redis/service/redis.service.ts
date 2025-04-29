@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { Redis } from 'ioredis'
 import { FilterDto } from '../../../app/websocket/application/dto/filter.dto'
-import { redisConfig } from 'src/core/config/redis.config'
+import { getRedisConfig } from 'src/core/config/redis.config'
+import { ConfigService } from '@nestjs/config'
 
 @Injectable()
 export class RedisService {
@@ -9,7 +10,7 @@ export class RedisService {
   private redisSubscriber: Redis
   private redisClient: Redis
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
     this.initializeRedis()
   }
 
@@ -23,11 +24,11 @@ export class RedisService {
    */
   private initializeRedis() {
     // Configuración de Redis extraída de las variables de entorno
-    const redis = {
-      host: redisConfig.host,
-      port: redisConfig.port,
-      db: redisConfig.db,
-    }
+    
+    const redis = getRedisConfig(
+      this.configService.get<string>('REDIS_HOST')!, 
+      this.configService.get<number>('REDIS_PORT')!, 
+      this.configService.get<number>('REDIS_DB')!)
 
     // Instancia de Redis para comandos de lectura/escritura
     this.redisClient = new Redis(redis)
@@ -104,6 +105,8 @@ export class RedisService {
       const prefix = process.env.REDIS_KEY_PREFIX || 'truck'
       // Construir patrón para buscar todas las claves de posición
       const pattern = `${prefix}:*`
+
+
       // Obtener todas las claves que cumplan con el patrón
       let keys = await this.redisClient.keys(pattern)
 
@@ -168,14 +171,4 @@ export class RedisService {
     return true
   }
 
-  async updatePosition(key: string, data: any) {
-    try {
-      await this.redisClient.hmset(key, {
-        ...data,
-        lastUpdate: new Date().toISOString(),
-      })
-    } catch (error) {
-      this.logger.error('Error al actualizar posición en Redis:', error)
-    }
-  }
 }

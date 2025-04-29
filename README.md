@@ -21,11 +21,20 @@ Servidor NestJS para manejo de posiciones GPS en tiempo real utilizando WebSocke
 1. Crear un archivo `.env` en la raíz del proyecto con las siguientes variables:
 
 ```env
-PORT=4000
-REDIS_HOST=redis
-REDIS_PORT=6379
-REDIS_DB=1
-REDIS_KEY_PREFIX=truck
+# Configuración del servidor
+PORT=3001
+WS_PORT=90
+ 
+# Configuración dpara redis
+REDIS_HOST='localhost'
+REDIS_PORT='6379'
+REDIS_DB='1'
+ 
+#prefijo de la base de datos
+REDIS_KEY_PREFIX='truck'
+ 
+#api-key de acceso al servicio
+API_KEY='e61513a3-ceb3-4869-be5e-67e6b554182f'
 ```
 
 ### Variables de Entorno
@@ -35,6 +44,7 @@ REDIS_KEY_PREFIX=truck
 - `REDIS_PORT`: Puerto de Redis (por defecto: 6379)
 - `REDIS_DB`: Base de datos de Redis a utilizar (por defecto: 0)
 - `REDIS_KEY_PREFIX`: Prefijo para las claves de Redis (por defecto: gps_)
+- `API_KEY`: Key para acceso al servicio debe contener adicionalmente .date_now (e61513a3-ceb3-4869-be5e-67e6b554182f.2025-04-29)
 
 ## Despliegue con Docker Compose
 
@@ -87,11 +97,6 @@ src/
 
 El servidor WebSocket proporciona los siguientes canales y eventos:
 
-#### Conexión
-```javascript
-const socket = io('http://localhost:4000');
-```
-
 #### Eventos del Cliente
 - `request-data`: Solicitar datos iniciales con filtros
   ```javascript
@@ -101,16 +106,16 @@ const socket = io('http://localhost:4000');
   ```
 
 #### Eventos del Servidor
-- `positions`: Recibe las posiciones iniciales filtradas
+- `initial-positions`: Recibe las posiciones iniciales filtradas
   ```javascript
-  socket.on('positions', (data) => {
+  socket.on('initial-positions', (data) => {
     console.log('Posiciones iniciales:', data);
   });
   ```
 
-- `update-positions`: Recibe actualizaciones de posición en tiempo real
+- `positions`: Recibe actualizaciones de posición en tiempo real
   ```javascript
-  socket.on('update-positions', (data) => {
+  socket.on('positions', (data) => {
     console.log('Actualización de posición:', data);
   });
   ```
@@ -148,17 +153,32 @@ pnpm run build
 const io = require('socket.io-client');
 
 // Configuration
+function timeStampDateTime() {
+   return new Date(
+     new Date().toLocaleString('en-ES', {
+       timeZone: 'america/Caracas',
+     }),
+   )
+ }
+ const SOCKET_URL = 'http://localhost:90'; // Adjust to your configuration
+ const date = timeStampDateTime().toISOString()
+ const API_KEY = 'e61513a3-ceb3-4869-be5e-67e6b554182f'+ '.' + date.split('T')[0];
 
-const SOCKET_URL = 'http://sintrya-demo.pdvsa.app:4000'; // Adjust to your configuration
 
-// Connect to WebSocket server
-const socket = io(SOCKET_URL);
+// Connect to WebSocket server with options
+const socket = io(SOCKET_URL, {
+    extraHeaders: {
+        'x-api-key': API_KEY
+    },
+    withCredentials: true
+});
 
 // Function to request data with filters
 function requestData(filters = {}) {
     const payload = {
         pseudoIPs: filters.pseudoIPs || [], // Now accepts a list of pseudoIPs
     };
+    console.log(payload)
     socket.emit('request-data', payload);
 }
 
@@ -187,13 +207,13 @@ socket.on('data-response', (data) => {
 //---------------------------------------------------------------
 
 // Listen Actual Positions
-socket.on('positions', (data) => {
+socket.on('initial-positions', (data) => {
     console.log('\nActual Positions:');
     console.log(JSON.stringify(data, null, 2));
 });
 
 // Listen Update Positions
-socket.on('update-positions', (positions) => {
+socket.on('positions', (positions) => {
     console.log('\nUpdate Positions:');
     console.log(JSON.stringify(positions, null, 2));
 });

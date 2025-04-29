@@ -34,7 +34,6 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   }
 
   private async handleRedisMessage(channel: string, message: string) {
-    console.log('entra en handleRedisMessage')
     await this.webSocketService.handleMessage(channel, message, this.server, this.clientFilters)
   }
 
@@ -47,12 +46,13 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
    * @param client Socket que representa al cliente conectado.
    */
   async handleConnection(client: Socket) {
+    
     const api = client.handshake.headers['x-api-key'] as string
     const active = new ApiKeyGuard().validateApiKey(api)
+
     if (!active) this.handleDisconnect(client)
     else {
       this.logger.log(`Cliente conectado: ${client.id}`)
-      await this.webSocketService.sendInitialPositions(client, this.clientFilters)
     }
   }
 
@@ -72,17 +72,28 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
     client.disconnect()
   }
 
+  /**
+   * Maneja la petición de datos iniciales desde el cliente.
+   *
+   * Este método se ejecuta cuando el cliente emite el evento 'request-data'.
+   * Almacena el filtro recibido y posteriormente envía las posiciones iniciales
+   * que cumplen con dicho filtro.
+   *
+   * @param client  Instancia del socket del cliente que solicita los datos.
+   * @param payload Objeto FilterDto con los criterios de filtrado proporcionados por el cliente.
+   */
   @UseGuards(ApiKeyGuard)
   @SubscribeMessage('request-data')
-  async handleRequestData(client: Socket, payload: any) {
-    console.log('entra aqas')
+  async handleRequestData(client: Socket, payload: FilterDto): Promise<void> {
     try {
-      this.logger.log('Solicitud de datos recibida con filtros:', payload)
-      this.clientFilters.set(client.id, payload)
-      const filteredPositions = await this.redisService.getFilteredPositions(payload)
-      client.emit('all-positions', filteredPositions)
+      // Guarda el filtro asociado al cliente usando su ID como clave
+      this.clientFilters.set(client.id, payload);
+      
+      // Envía al cliente las posiciones iniciales aplicando el filtro registrado
+      await this.webSocketService.sendInitialPositions(client, this.clientFilters)
     } catch (error) {
-      this.logger.error('Error al obtener datos filtrados:', error)
+      // Registra el error en caso de fallo al obtener o enviar los datos filtrados
+      this.logger.error('Error al obtener datos filtrados:', error);
     }
   }
 

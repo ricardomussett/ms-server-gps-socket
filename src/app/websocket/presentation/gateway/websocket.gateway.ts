@@ -1,61 +1,98 @@
-import { WebSocketGateway, SubscribeMessage, WebSocketServer } from '@nestjs/websockets'
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
-import { FilterDto } from '../../application/dto/filter.dto'
-import { WebSocketService } from '../../application/service/websocket.service'
-import { Logger, UseGuards } from '@nestjs/common'
+import { Logger } from '@nestjs/common'
 import { RedisService } from 'src/core/redis/service/redis.service'
-import { ApiKeyGuard } from 'src/core/guards/api-key.guard'
 
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
-export class GpsWebSocketGateway {
+export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server
-  private readonly logger = new Logger(WebSocketGateway.name)
+  private readonly logger = new Logger(GpsWebSocketGateway.name)
   private clientFilters: Map<string, any> = new Map()
 
-  constructor(
-    private readonly webSocketService: WebSocketService,
-    private readonly redisService: RedisService,
-  ) {
+  constructor(private readonly redisService: RedisService) {
     this.redisService.onMessage((channel, message) => {
       this.handleRedisMessage(channel, message)
     })
   }
 
-  /**
-   * Controlador de los mensajes entrados desde Redis para actualizaciones de posición.
-   *
-   * @param channel - Nombre del canal de Redis que envía el mensaje.
-   * @param message - Mensaje en formato JSON con la actualización.
-   */
-  private handleRedisMessage(channel: string, message: string): void {
-    this.webSocketService.handleMessage(channel, message)
+  private handleRedisMessage(channel: string, message: string) {
+    if (channel === 'position-updates') {
+      try {
+        const data = JSON.parse(message)
+        if (data.type === 'position') {
+          this.handlePositionUpdate(data)
+        }
+      } catch (error) {
+        this.logger.error('Error al procesar mensaje de Redis:', error)
+      }
+    }
   }
 
-  /**
-   * Maneja la petición de datos iniciales desde el cliente.
-   *
-   * Este método se ejecuta cuando el cliente emite el evento 'request-data'.
-   * Almacena el filtro recibido y posteriormente envía las posiciones iniciales
-   * que cumplen con dicho filtro.
-   *
-   * @param client  Instancia del socket del cliente que solicita los datos.
-   * @param payload Objeto FilterDto con los criterios de filtrado proporcionados por el cliente.
-   */
-  @UseGuards(ApiKeyGuard)
-  @SubscribeMessage('request-data')
-  async handleRequestData(client: Socket, payload: FilterDto): Promise<void> {
+  private handlePositionUpdate(data: any) {
     try {
-      // Guarda el filtro asociado al cliente usando su ID como clave
-      this.clientFilters.set(client.id, payload)
+      const positionData = {
+        ...data.data,
+        timestamp: data.timestamp,
+      }
 
-      // Envía al cliente las posiciones iniciales aplicando el filtro registrado
-      await this.webSocketService.sendInitialPositions(client)
+      this.logger.log('---Enviando actualización de posición:', positionData)
+
+      // Enviar la actualización solo a los clientes cuyos filtros coincidan
+      this.server.sockets.sockets.forEach((client) => {
+        const clientFilter = this.clientFilters.get(client.id)
+        if (this.redisService.matchesFilters(positionData, clientFilter)) {
+          client.emit('all-positions', positionData)
+        }
+      })
+
+      // Actualizar Redis con la nueva posición
+      const key = `${process.env.REDIS_KEY_PREFIX || 'truck'}:${data.data.id}`
+      this.redisService.updatePosition(key, data.data)
     } catch (error) {
-      // Registra el error en caso de fallo al obtener o enviar los datos filtrados
+      this.logger.error('Error al manejar actualización de posición:', error)
+    }
+  }
+
+  async handleConnection(client: Socket) {
+    this.logger.log(`Cliente conectado: ${client.id}`)
+    await this.sendInitialPositions(client)
+  }
+
+  handleDisconnect(client: Socket) {
+    this.logger.log(`Cliente desconectado: ${client.id}`)
+    this.clientFilters.delete(client.id)
+  }
+
+  private async sendInitialPositions(client: Socket) {
+    try {
+      const clientFilter = this.clientFilters.get(client.id)
+      const positions = await this.redisService.getFilteredPositions(clientFilter)
+      if (Object.keys(positions).length > 0) {
+        client.emit('all-positions', positions)
+      }
+    } catch (error) {
+      this.logger.error('Error al enviar posiciones iniciales:', error)
+    }
+  }
+
+  @SubscribeMessage('request-data')
+  async handleRequestData(client: Socket, payload: any) {
+    try {
+      this.logger.log('Solicitud de datos recibida con filtros:', payload)
+      this.clientFilters.set(client.id, payload)
+      const filteredPositions = await this.redisService.getFilteredPositions(payload)
+      client.emit('all-positions', filteredPositions)
+    } catch (error) {
       this.logger.error('Error al obtener datos filtrados:', error)
     }
   }

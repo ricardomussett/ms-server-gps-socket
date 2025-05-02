@@ -38,7 +38,7 @@ API_KEY=1234567891234567891345
 
 #password de encriptacion
 ENCRYPT_PASSWORD=asd12345678913456789asd
-ENCRYPT_IV=123456789164654649879
+ENCRYPT_IV=1234567890123456
 
 ```
 
@@ -197,7 +197,123 @@ pnpm run start:dev
 pnpm run build
 ```
 ## Código de ejemplo de conexion
+ACTUAL
+```
+const io = require('socket.io-client');
+const crypto = require('crypto');
 
+// Configuración de encriptación
+const ENCRYPT_PASSWORD = 'asd12345678913456789asd'; // Debe coincidir con el servidor
+const ENCRYPT_IV = '1234567890123456'; // 16 caracteres, Debe coincidir con el servidor
+
+// Función para encriptar la API key
+function encryptAPIKey(apiKey) {
+  const cipher = crypto.createCipheriv(
+    'aes-256-cbc',
+    Buffer.from(ENCRYPT_PASSWORD, 'hex'),
+    Buffer.from(ENCRYPT_IV, 'hex')
+  );
+  
+  let encrypted = cipher.update(apiKey, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return encrypted;
+}
+
+// Función para obtener timestamp en la zona horaria correcta
+function timeStampDateTime() {
+  return new Date(
+    new Date().toLocaleString('en-ES', {
+      timeZone: 'America/Caracas',
+    }),
+  );
+}
+
+const SOCKET_URL = 'http://localhost:90'; // Ajusta según tu configuración
+const date = timeStampDateTime().toISOString();
+const rawApiKey = '1234567891234567891345'; // Debe coincidir con el servidor
+const apiKeyWithDate = rawApiKey + '.' + date.split('T')[0];
+const encryptedApiKey = encryptAPIKey(apiKeyWithDate);
+
+// Conectar al servidor WebSocket con opciones
+const socket = io(SOCKET_URL, {
+  extraHeaders: {
+    'x-api-key': encryptedApiKey
+  },
+  withCredentials: true
+});
+
+// Función para solicitar datos con filtros
+function requestData(filters = {}) {
+  const payload = {
+    pseudoIPs: filters.pseudoIPs || [], // Ahora acepta una lista de pseudoIPs
+  };
+  console.log('Enviando solicitud con filtros:', payload);
+  socket.emit('request-data', payload);
+}
+
+// Manejadores de eventos de conexión
+socket.on('connect', () => {
+  console.log('Conexión establecida con el servidor WebSocket');
+  
+  // Ejemplo de uso de requestData con múltiples pseudoIPs
+  requestData({
+    pseudoIPs: [
+      '98.4.201.36',
+      '98.4.199.36',
+      '98.4.199.37',
+      '98.4.199.38',
+      '98.4.199.39'
+    ],
+  });
+});
+
+// Escuchar respuesta de datos
+socket.on('data-response', (data) => {
+  console.log('\nDatos recibidos:');
+  console.log(JSON.stringify(data, null, 2));
+});
+
+// Escuchar posiciones actuales
+socket.on('initial-positions', (data) => {
+  console.log('\nPosiciones actuales:');
+  console.log(JSON.stringify(data, null, 2));
+});
+
+// Escuchar actualizaciones de posición
+socket.on('positions', (positions) => {
+  console.log('\nActualización de posiciones:');
+  console.log(JSON.stringify(positions, null, 2));
+});
+
+// Manejadores de errores
+socket.on('connect_error', (error) => {
+  console.error('Error de conexión:', error.message);
+  if (error.response) {
+    console.error('Detalles del error:', error.response.data);
+  }
+});
+
+socket.on('error', (error) => {
+  console.error('Error general:', error);
+});
+
+// Manejador de desconexión
+socket.on('disconnect', (reason) => {
+  console.log('Desconectado del servidor:', reason);
+  if (reason === 'io server disconnect') {
+    console.log('El servidor ha cerrado la conexión');
+  }
+});
+
+// Mantener el proceso en ejecución
+process.on('SIGINT', () => {
+  console.log('\nCerrando cliente...');
+  socket.disconnect();
+  process.exit();
+});
+```
+
+DEPREADO!!!
 ```
 const io = require('socket.io-client');
 

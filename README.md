@@ -115,23 +115,32 @@ docker-compose down
 ## Estructura del Proyecto
 
 ```
-src/
-├── websocket/           # Módulo de WebSocket
-│   ├── redis.service.ts # Servicio de Redis
-│   └── websocket.gateway.ts # Gateway de WebSocket
-├── main.ts             # Punto de entrada
-└── app.module.ts       # Módulo principal
+ms-server-gps-socket/
+│
+├── src/
+│   ├── app/
+│   │   └── websocket/
+│   │       ├── application/
+│   │       │   ├── dto/
+│   │       │   │   └── filter.dto.ts
+│   │       │   └── service/
+│   │       │       └── websocket.service.ts
+│   │       └── presentation/
+│   │           └── gateway/
+│   │               └── websocket.gateway.ts
+│   ├── core/
+│   │   ├── guards/
+│   │   │   └── api-key.guard.ts
+│   │   └── redis/
+│   │       └── service/
+│   │           └── redis.service.ts
+│   ├── main.ts
+│   └── main.module.ts
+│
+├── package.json
+├── README.md
+└── ...otros archivos de configuración (por ejemplo, .env, tsconfig.json, etc.)
 ```
-
-## Uso de la API
-
-
-
-### REST API
-
-- `GET /positions`: Obtener todas las posiciones
-- `GET /positions/filtered`: Obtener posiciones filtradas
-- `POST /positions`: Actualizar posición
 
 ### Canales WebSocket Disponibles
 

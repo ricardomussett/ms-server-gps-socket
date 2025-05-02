@@ -33,8 +33,13 @@ REDIS_DB='1'
 #prefijo de la base de datos
 REDIS_KEY_PREFIX='truck'
  
-#api-key de acceso al servicio
-API_KEY='e61513a3-ceb3-4869-be5e-67e6b554182f'
+#api-key de acceso al servicio (encriptado)
+API_KEY=1234567891234567891345
+
+#password de encriptacion
+ENCRYPT_PASSWORD=asd12345678913456789asd
+ENCRYPT_IV=123456789164654649879
+
 ```
 
 ### Variables de Entorno

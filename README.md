@@ -50,6 +50,41 @@ ENCRYPT_IV=123456789164654649879
 - `REDIS_DB`: Base de datos de Redis a utilizar (por defecto: 0)
 - `REDIS_KEY_PREFIX`: Prefijo para las claves de Redis (por defecto: gps_)
 - `API_KEY`: Key para acceso al servicio debe contener adicionalmente .date_now (e61513a3-ceb3-4869-be5e-67e6b554182f.2025-04-29)
+- `ENCRYPT_PASSWORD`: Clave secreta para el cifrado AES-256-CBC
+- `ENCRYPT_IV`: Vector de inicialización para el cifrado AES
+  
+## Protocolo de Autenticación
+
+### Especificación de la Cabecera
+Los clientes deben incluir una cabecera `x-api-key` con el siguiente formato:
+
+```
+x-api-key = ENCRIPTADO(API_KEY + '.AAAA-MM-DD')
+```
+
+### Proceso de Encriptación
+1. **Construir el payload**:
+   ```javascript
+   const today = new Date().toISOString().split('T')[0]; // AAAA-MM-DD
+   const payload = `${process.env.API_KEY}.${today}`;
+   ```
+
+2. **Encriptar usando AES-256-CBC**:
+   ```javascript
+   const crypto = require('crypto');
+   
+   function encryptAPIKey(payload) {
+     const cipher = crypto.createCipheriv(
+       'aes-256-cbc',
+       Buffer.from(process.env.ENCRYPT_PASSWORD, 'hex'),
+       Buffer.from(process.env.ENCRYPT_IV, 'hex')
+     );
+     
+     let encrypted = cipher.update(payload, 'utf8', 'hex');
+     encrypted += cipher.final('hex');
+     return encrypted;
+   }
+   ```
 
 ## Despliegue con Docker Compose
 

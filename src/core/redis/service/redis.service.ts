@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Injectable, Logger } from '@nestjs/common'
 import { Redis } from 'ioredis'
 import { FilterDto } from '../../../app/websocket/application/dto/filter.dto'
 import { getRedisConfig } from 'src/core/config/redis.config'
 import { ConfigService } from '@nestjs/config'
+import { IWebSocketData } from 'src/app/websocket/domain/interface/websocket.interface'
 
 @Injectable()
 export class RedisService {
@@ -102,7 +101,7 @@ export class RedisService {
    * @returns Promise<any[]> - Array de objetos de posición que cumplen los filtros.
    *                           Devuelve array vacío si no hay coincidencias o ante un error.
    */
-  async getFilteredPositions(filters: FilterDto): Promise<any[]> {
+  async getFilteredPositions(filters: FilterDto): Promise<IWebSocketData[]> {
     try {
       // Definir prefijo para las claves en Redis. Por defecto 'truck'.
       const prefix = process.env.REDIS_KEY_PREFIX || 'truck'
@@ -121,11 +120,11 @@ export class RedisService {
         return []
       }
 
-      const positionsList: any[] = []
+      const positionsList: IWebSocketData[] = []
       // Recorrer cada clave válida para obtener sus datos y aplicar filtros
       for (const key of keys) {
         // Leer todos los campos del hash almacenado en Redis
-        const data = await this.redisClient.hgetall(key)
+        const data = (await this.redisClient.hgetall(key)) as unknown as IWebSocketData
         // Verificar que existan datos y que cumplan los criterios de filtrado
         if (data && Object.keys(data).length > 0 && this.matchesFilters(data, filters)) {
           positionsList.push(data)
@@ -147,7 +146,7 @@ export class RedisService {
    * @param filters - Filtros a aplicar (FilterDto), opcional.
    * @returns true si no hay filtros o si `data` coincide con los filtros; false en caso contrario.
    */
-  public matchesFilters(data: Record<string, string>, filters: FilterDto): boolean {
+  public matchesFilters(data: IWebSocketData, filters: FilterDto): boolean {
     // Si no se proporcionan filtros, acepta todos los datos
     if (!filters || (filters.pseudoIPs && filters.pseudoIPs.length === 0)) {
       return true
@@ -158,12 +157,12 @@ export class RedisService {
       // Caso: filtro con múltiples pseudoIPs
       if (Array.isArray(filters.pseudoIPs)) {
         // Rechaza si el gpsPseudoIP del dato no está en la lista
-        if (!filters.pseudoIPs.includes(data.gpsPseudoIP)) {
+        if (!filters.pseudoIPs.includes(data.pseudoIP)) {
           return false
         }
       } else {
         // Caso: filtro con un único pseudoIP
-        if (data.gpsPseudoIP !== filters.pseudoIPs) {
+        if (data.pseudoIP !== filters.pseudoIPs) {
           return false
         }
       }

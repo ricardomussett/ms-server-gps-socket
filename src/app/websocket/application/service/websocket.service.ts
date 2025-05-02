@@ -2,10 +2,14 @@ import { Server, Socket } from 'socket.io'
 import { Injectable, Logger } from '@nestjs/common'
 import { RedisService } from '../../../../core/redis/service/redis.service'
 import { FilterDto } from '../dto/filter.dto'
+import { WebSocketTransformer } from '../../domain/transformer/websocket.transformer'
+import { IWebSocketData } from '../../domain/interface/websocket.interface'
+import { PositionsDTO } from '../dto/positions.dto'
 
 @Injectable()
 export class WebSocketService {
   private readonly logger = new Logger(WebSocketService.name)
+  private readonly transformer = new WebSocketTransformer()
 
   constructor(private readonly redisService: RedisService) {}
 
@@ -26,7 +30,9 @@ export class WebSocketService {
       const clientFilter = clientFilters.get(client.id) as FilterDto
 
       // 2. Consultar Redis para obtener las posiciones filtradas
-      const positions = await this.redisService.getFilteredPositions(clientFilter)
+      const positions: PositionsDTO[] = this.transformer.wrap(
+        await this.redisService.getFilteredPositions(clientFilter),
+      )
 
       // 3. Solo emitir si hay posiciones válidas
       if (positions.length > 0) {
@@ -54,7 +60,7 @@ export class WebSocketService {
     try {
       if (channel === 'position-updates') {
         try {
-          const data = JSON.parse(message) as { data: { id: number }; timestamp: string; type: string }
+          const data = JSON.parse(message) as { data: IWebSocketData; timestamp: Date; type: string }
           if (data.type === 'position') {
             this.handlePositionUpdate(data, server, clientFilters)
           }
@@ -82,24 +88,23 @@ export class WebSocketService {
    * @returns void
    */
   handlePositionUpdate(
-    data: { data: { id: number }; timestamp: string },
+    data: { data: IWebSocketData; timestamp: Date },
     server: Server,
     clientFilters: Map<string, FilterDto>,
   ) {
     try {
-      const safeData = data.data && typeof data.data === 'object' ? data.data : {}
-      const positionData = {
+      const safeData = data.data
+      const positionData: IWebSocketData = {
         ...safeData,
         timestamp: data.timestamp,
       }
-
-      this.logger.log('<- Obteniendo actualización de posición:', positionData)
+      this.logger.log('<- Obteniendo actualización de posición:', this.transformer.wrap([positionData]))
 
       // Enviar la actualización solo a los clientes cuyos filtros coincidan
       server.sockets.sockets.forEach((client) => {
         const clientFilter = clientFilters.get(client.id) as FilterDto
         if (this.redisService.matchesFilters(positionData, clientFilter)) {
-          client.emit('positions', positionData)
+          client.emit('positions', this.transformer.wrap([positionData]))
         }
       })
     } catch (error) {

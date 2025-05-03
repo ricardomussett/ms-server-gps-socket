@@ -26,6 +26,9 @@ export class WebSocketService {
    */
   public async sendInitialPositions(client: Socket, clientFilters: Map<string, FilterDto>) {
     try {
+
+      this.logger.log('Enviando posiciones iniciales al cliente:-------------------------', client.id)
+
       // 1. Obtener el filtro asignado al cliente
       const clientFilter = clientFilters.get(client.id) as FilterDto
 
@@ -98,7 +101,7 @@ export class WebSocketService {
         ...safeData,
         timestamp: data.timestamp,
       }
-      this.logger.log('<- Obteniendo actualización de posición:', this.transformer.wrap([positionData]))
+      // this.logger.log('<- Obteniendo actualización de posición:', this.transformer.wrap([positionData]))
 
       // Enviar la actualización solo a los clientes cuyos filtros coincidan
       server.sockets.sockets.forEach((client) => {

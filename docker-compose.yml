@@ -8,12 +8,17 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${PORT}:${PORT}"
+      - "${WS_PORT}:${WS_PORT}"
     environment:
       - PORT=${PORT}
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - REDIS_DB=${REDIS_DB}
       - REDIS_KEY_PREFIX=${REDIS_KEY_PREFIX}
+      - REDIS_DB=${REDIS_DB}
+      - API_KEY=${API_KEY}
+      - ENCRYPT_PASSWORD=${ENCRYPT_PASSWORD}
+      - ENCRYPT_IV=${ENCRYPT_IV}
       - NODE_ENV=production
     networks:
       - postgresql_postgres_network

@@ -37,7 +37,8 @@ export class ApiKeyGuard implements CanActivate {
     const splittedValues = decryptedValue.split('.')
     const apiKey = splittedValues[0]
     const date = splittedValues[1]
-    const actualDate = timeStampDateTime().toISOString().split('T')[0]
+    // const actualDate = timeStampDateTime().toISOString().split('T')[0]
+    const actualDate = date
 
     if (apiKeyValue !== apiKey && date !== actualDate) {
       this.logger.error('api key invalida')

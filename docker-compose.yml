@@ -11,6 +11,7 @@ services:
       - "${WS_PORT}:${WS_PORT}"
     environment:
       - PORT=${PORT}
+      - WS_PORT=${WS_PORT}
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - REDIS_DB=${REDIS_DB}

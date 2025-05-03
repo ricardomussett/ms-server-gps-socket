@@ -9,6 +9,7 @@ Servidor NestJS para manejo de posiciones GPS en tiempo real utilizando WebSocke
 - API REST para consulta de posiciones
 - Filtrado de posiciones en tiempo real
 - Escalable y de alto rendimiento
+- Los dispositivos transmiten con una frecuancia superior a los 30 segundos
 
 ## Requisitos Previos
 

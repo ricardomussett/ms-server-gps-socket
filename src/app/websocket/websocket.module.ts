@@ -9,7 +9,12 @@ import { EncryptService } from 'src/core/encryption/service/encryption.service'
 @Module({
   imports: [CoreModule, EncryptionModule],
   controllers: [WebSocketController],
-  providers: [GpsWebSocketGateway, EncryptService, WebSocketService, ApiKeyGuard],
+  providers: [
+    GpsWebSocketGateway,
+    EncryptService,
+    WebSocketService,
+    ApiKeyGuard,
+  ],
   exports: [GpsWebSocketGateway],
 })
 export class WebSocketModule {}

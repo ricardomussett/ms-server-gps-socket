@@ -7,21 +7,30 @@ import { ConfigService } from '@nestjs/config'
 
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-  private encryptService: EncryptService
 
   private logger: Logger = new Logger(ApiKeyGuard.name)
 
-  constructor() {
-    this.encryptService = new EncryptService(new ConfigService())
-  }
+  constructor(
+    private readonly encryptService: EncryptService,
+    private readonly configService: ConfigService
+  ) {}
 
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
     const client = context.switchToWs().getClient<Socket>()
 
-    return this.validateApiKey(client.handshake.headers['x-api-key'] as string)
+    return this.validateApiKey(client.handshake.query['x-api-key'] as string)
   }
 
   public validateApiKey(apiKeyHeader: string): boolean {
+    // Obtener el API Key de los query parameters
+    const apiKey = this.configService.get<string>('API_KEY')
+    
+    // Validar existencia
+    if (!apiKey) {
+      this.logger.error('API_KEY no configurada en variables de entorno')
+      return false
+    }
+
     if (!apiKeyHeader) {
       this.logger.error('api key no encontrada')
       return false
@@ -35,12 +44,12 @@ export class ApiKeyGuard implements CanActivate {
     const apiKeyValue = this.encryptService.decrypt(process.env.API_KEY!)
     const decryptedValue = this.encryptService.decrypt(apiKeyHeader)
     const splittedValues = decryptedValue.split('.')
-    const apiKey = splittedValues[0]
+    const apiKeyFromQuery = splittedValues[0]
     const date = splittedValues[1]
     // const actualDate = timeStampDateTime().toISOString().split('T')[0]
     const actualDate = date
 
-    if (apiKeyValue !== apiKey && date !== actualDate) {
+    if (apiKeyValue !== apiKeyFromQuery && date !== actualDate) {
       this.logger.error('api key invalida')
       return false
     }

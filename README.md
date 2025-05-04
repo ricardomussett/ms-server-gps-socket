@@ -237,11 +237,11 @@ const encryptedApiKey = encryptAPIKey(apiKeyWithDate);
 
 // Conectar al servidor WebSocket con opciones
 const socket = io(SOCKET_URL, {
-  extraHeaders: {
-    'x-api-key': encryptedApiKey
-  },
-  withCredentials: true
-});
+    query: {
+      'x-api-key': encryptedApiKey
+    },
+    transports: ['websocket']
+  })
 
 // Función para solicitar datos con filtros
 function requestData(filters = {}) {

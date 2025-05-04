@@ -15,7 +15,7 @@ import { ApiKeyGuard } from 'src/core/guards/api-key.guard'
 @WebSocketGateway(Number(process.env.WS_PORT || 90), {
   cors: {
     origin: '*',
-    allowedHeaders: ['api-key'],
+    // allowedHeaders: ['api-key'],
     credentials: true,
   },
 })
@@ -27,6 +27,7 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
   constructor(
     private readonly redisService: RedisService,
     private readonly webSocketService: WebSocketService,
+    private readonly apiKeyGuard: ApiKeyGuard
   ) {
     this.redisService.onMessage((channel, message) => {
       this.handleRedisMessage(channel, message)
@@ -46,8 +47,8 @@ export class GpsWebSocketGateway implements OnGatewayConnection, OnGatewayDiscon
    * @param client Socket que representa al cliente conectado.
    */
   handleConnection(client: Socket) {
-    const api = client.handshake.headers['x-api-key'] as string
-    const active = new ApiKeyGuard().validateApiKey(api)
+    const apiKey = client.handshake.query['x-api-key'] as string
+    const active = this.apiKeyGuard.validateApiKey(apiKey)
 
     if (!active) this.handleDisconnect(client)
     else {

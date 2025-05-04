@@ -9,6 +9,7 @@ Servidor NestJS para manejo de posiciones GPS en tiempo real utilizando WebSocke
 - API REST para consulta de posiciones
 - Filtrado de posiciones en tiempo real
 - Escalable y de alto rendimiento
+- Los dispositivos transmiten con una frecuancia superior a los 30 segundos
 
 ## Requisitos Previos
 
@@ -203,8 +204,8 @@ const io = require('socket.io-client');
 const crypto = require('crypto');
 
 // Configuración de encriptación
-const ENCRYPT_PASSWORD = 'asd12345678913456789asd'; // Debe coincidir con el servidor
-const ENCRYPT_IV = '1234567890123456'; // 16 caracteres, Debe coincidir con el servidor
+const ENCRYPT_PASSWORD = '405c8bdd2c4fa49ed7e2f45993c271482437cb1be57e0e6c75450e93f9b369fb'; // Debe coincidir con el servidor
+const ENCRYPT_IV = '9bdab89e0562f42d4aa96b72d241388c'; // 16 caracteres, Debe coincidir con el servidor
 
 // Función para encriptar la API key
 function encryptAPIKey(apiKey) {
@@ -228,9 +229,9 @@ function timeStampDateTime() {
   );
 }
 
-const SOCKET_URL = 'http://localhost:90'; // Ajusta según tu configuración
+const SOCKET_URL = 'http://8.210.137.187:4000'; // Ajusta según tu configuración
 const date = timeStampDateTime().toISOString();
-const rawApiKey = '1234567891234567891345'; // Debe coincidir con el servidor
+const rawApiKey = 'e61513a3-ceb3-4869-be5e-67e6b554182f'; // Debe coincidir con el servidor
 const apiKeyWithDate = rawApiKey + '.' + date.split('T')[0];
 const encryptedApiKey = encryptAPIKey(apiKeyWithDate);
 
@@ -255,14 +256,10 @@ function requestData(filters = {}) {
 socket.on('connect', () => {
   console.log('Conexión establecida con el servidor WebSocket');
   
-  // Ejemplo de uso de requestData con múltiples pseudoIPs
+  // Ejemplo de uso de requestData con múltiples pseudoIPs, actualmente existe solo un dispositivo conectado
   requestData({
     pseudoIPs: [
       '98.4.201.36',
-      '98.4.199.36',
-      '98.4.199.37',
-      '98.4.199.38',
-      '98.4.199.39'
     ],
   });
 });
@@ -310,99 +307,5 @@ process.on('SIGINT', () => {
   console.log('\nCerrando cliente...');
   socket.disconnect();
   process.exit();
-});
-```
-
-DEPREADO!!!
-```
-const io = require('socket.io-client');
-
-// Configuration
-function timeStampDateTime() {
-   return new Date(
-     new Date().toLocaleString('en-ES', {
-       timeZone: 'america/Caracas',
-     }),
-   )
- }
- const SOCKET_URL = 'http://localhost:90'; // Adjust to your configuration
- const date = timeStampDateTime().toISOString()
- const API_KEY = 'e61513a3-ceb3-4869-be5e-67e6b554182f'+ '.' + date.split('T')[0];
-
-
-// Connect to WebSocket server with options
-const socket = io(SOCKET_URL, {
-    extraHeaders: {
-        'x-api-key': API_KEY
-    },
-    withCredentials: true
-});
-
-// Function to request data with filters
-function requestData(filters = {}) {
-    const payload = {
-        pseudoIPs: filters.pseudoIPs || [], // Now accepts a list of pseudoIPs
-    };
-    console.log(payload)
-    socket.emit('request-data', payload);
-}
-
-// handle connection events
-socket.on('connect', () => {
-    console.log('Connected to WebSocket server');
-    
-    // Example of using requestData with multiple pseudoIPs
-    requestData({
-        pseudoIPs: [
-            '98.4.201.36',
-            '98.4.199.36',
-            '98.4.199.37',
-            '98.4.199.38',
-            '98.4.199.39'
-        ],
-    });
-});
-
-// Listen data-response
-socket.on('data-response', (data) => {
-    console.log('\nDatos recibidos:');
-    console.log(JSON.stringify(data, null, 2));
-});
-
-//---------------------------------------------------------------
-
-// Listen Actual Positions
-socket.on('initial-positions', (data) => {
-    console.log('\nActual Positions:');
-    console.log(JSON.stringify(data, null, 2));
-});
-
-// Listen Update Positions
-socket.on('positions', (positions) => {
-    console.log('\nUpdate Positions:');
-    console.log(JSON.stringify(positions, null, 2));
-});
-
-//---------------------------------------------------------------
-
-// handle errors
-socket.on('connect_error', (error) => {
-    console.error('Error de conexión:', error);
-});
-
-socket.on('error', (error) => {
-    console.error('Error:', error);
-});
-
-// handle disconnect
-socket.on('disconnect', (reason) => {
-    console.log('Desconectado del servidor:', reason);
-});
-
-// keep the process running
-process.on('SIGINT', () => {
-    console.log('Closing client...');
-    socket.disconnect();
-    process.exit();
 });
 ```
